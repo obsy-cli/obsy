@@ -7,6 +7,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.1] — 2026-04-13
+
+### Fixed
+
+- **Escaped pipe in wikilinks** (`[[note\|alias]]`) — Obsidian escapes `|` as `\|` inside markdown table cells so the table parser doesn't split on it. obsy was treating the backslash as part of the link target, producing a non-existent path like `inbox/index\` instead of `inbox/index`. Both link resolution (index, `unresolved`, `backlinks`) and link rewriting (`move`, `rename`) now handle `\|` correctly.
+
+### Changed
+
+- **`links` command output** — the `link` field now contains the clean target path (`inbox/index`) instead of the raw inner text with display text attached (`inbox/index\|inbox`). A new `display` field carries the display text when present. Applies to all output formats (`text`, `json`, `tsv`, `csv`).
+
+---
+
 ## [0.1.0] — 2026-04-13
 
 Initial release. A self-contained CLI for querying Obsidian-compatible markdown vaults — no desktop app, no daemon, no CGO.
