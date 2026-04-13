@@ -19,7 +19,9 @@ type BrokenLink struct {
 
 // OutgoingLink is a link from a file with its resolved target (empty = unresolved).
 type OutgoingLink struct {
-	Raw      string
+	Raw      string // raw inner content, e.g. "inbox/index\|inbox"
+	Target   string // stripped path, e.g. "inbox/index"
+	Display  string // display text after | or \|, e.g. "inbox"; empty if none
 	Resolved string // relative path, or "" if unresolved
 	IsEmbed  bool
 }
@@ -217,11 +219,24 @@ func (idx *Index) LinksFrom(file string) []OutgoingLink {
 	for _, link := range entry.Links {
 		out = append(out, OutgoingLink{
 			Raw:      link.Raw,
+			Target:   vault.StripLinkTarget(link.Raw),
+			Display:  linkDisplay(link.Raw),
 			Resolved: idx.resolve(link.Raw, entry.Path, aliases, files),
 			IsEmbed:  link.IsEmbed,
 		})
 	}
 	return out
+}
+
+// linkDisplay extracts the display text from a raw wikilink inner string.
+// Returns "" when no display text is present.
+// Handles both | (normal) and \| (table cell escape).
+func linkDisplay(raw string) string {
+	i := strings.IndexByte(raw, '|')
+	if i < 0 {
+		return ""
+	}
+	return strings.TrimSpace(raw[i+1:])
 }
 
 // ResolveFileArg resolves a file argument (name or path) to a relative path.

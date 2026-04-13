@@ -469,6 +469,68 @@ func TestRename_FileNotFound(t *testing.T) {
 	}
 }
 
+func TestMove_EscapedPipeLinksUpdated(t *testing.T) {
+	v, idx := setupTempVault(t)
+
+	// table-links.md references note-a as [[note-a\|first note]] (table cell syntax).
+	// Moving note-a.md should rewrite it to [[moved-a\|first note]].
+	result, err := Move(v, idx, "note-a.md", "moved-a.md")
+	if err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	updated := make(map[string]bool)
+	for _, u := range result.Updated {
+		updated[u] = true
+	}
+	if !updated["table-links.md"] {
+		t.Error("table-links.md should have been updated (it links to note-a via \\|)")
+	}
+
+	content, err := os.ReadFile(filepath.Join(v.Root, "table-links.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(content)
+	if strings.Contains(body, `[[note-a\|`) {
+		t.Error("table-links.md still contains old [[note-a\\| reference after move")
+	}
+	if !strings.Contains(body, `[[moved-a\|`) {
+		t.Error("table-links.md missing new [[moved-a\\| reference after move")
+	}
+}
+
+func TestRename_EscapedPipeLinksUpdated(t *testing.T) {
+	v, idx := setupTempVault(t)
+
+	// table-links.md references note-a as [[note-a\|first note]].
+	// Renaming note-a.md should rewrite it to [[note-a-renamed\|first note]].
+	result, err := Rename(v, idx, "note-a.md", "note-a-renamed")
+	if err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+
+	updated := make(map[string]bool)
+	for _, u := range result.Updated {
+		updated[u] = true
+	}
+	if !updated["table-links.md"] {
+		t.Error("table-links.md should have been updated (it links to note-a via \\|)")
+	}
+
+	content, err := os.ReadFile(filepath.Join(v.Root, "table-links.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(content)
+	if strings.Contains(body, `[[note-a\|`) {
+		t.Error("table-links.md still contains old [[note-a\\| reference after rename")
+	}
+	if !strings.Contains(body, `[[note-a-renamed\|`) {
+		t.Error("table-links.md missing new [[note-a-renamed\\| reference after rename")
+	}
+}
+
 func TestMove_PreservesFilePermissions(t *testing.T) {
 	v, idx := setupTempVault(t)
 

@@ -42,7 +42,7 @@ func init() {
 						if resolved == "" {
 							resolved = "[unresolved]"
 						}
-						fmt.Fprintf(os.Stdout, "%s → %s\n", l.Raw, resolved)
+						fmt.Fprintf(os.Stdout, "%s → %s\n", l.Target, resolved)
 					}
 					return nil
 				}
@@ -52,14 +52,14 @@ func init() {
 					if resolved == "" {
 						resolved = "[unresolved]"
 					}
-					rows = append(rows, output.NewRow("link", l.Raw, "resolved", resolved))
+					rows = append(rows, output.NewRow("link", l.Target, "display", l.Display, "resolved", resolved))
 				}
 				return output.Print(os.Stdout, cfg.Format, rows)
 			}
 
 			var rows []output.Row
 			for _, l := range outgoing {
-				rows = append(rows, output.NewRow("link", l.Raw))
+				rows = append(rows, output.NewRow("link", l.Target, "display", l.Display))
 			}
 			return output.Print(os.Stdout, cfg.Format, rows)
 		},
