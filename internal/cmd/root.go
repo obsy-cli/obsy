@@ -9,6 +9,9 @@ import (
 // ErrNoResults is returned by commands that found no results (exit code 1).
 var ErrNoResults = errors.New("no results")
 
+// Version is set at build time via -ldflags.
+var Version = "dev"
+
 // Config holds the global flags shared by all commands.
 type Config struct {
 	Vault   string
@@ -22,6 +25,7 @@ var cfg Config
 var rootCmd = &cobra.Command{
 	Use:           "obsy",
 	Short:         "Obsidian vault CLI — search, graph, tags, tasks, file ops",
+	Version:       Version,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
