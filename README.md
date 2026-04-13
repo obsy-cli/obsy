@@ -20,7 +20,15 @@ Obsidian ships a CLI (`obsidian`) but it only works as a sidecar to the running 
 go install github.com/obsy-cli/obsy/cmd/obsy@latest
 ```
 
-Requires Go 1.24+. Installs to `$(go env GOPATH)/bin/obsy`.
+Requires Go 1.24+. Installs to `$(go env GOBIN)` if set, otherwise `$(go env GOPATH)/bin`. Make sure that directory is on your `$PATH`:
+
+```bash
+# bash / zsh — add to ~/.bashrc or ~/.zshrc
+export PATH="$PATH:$(go env GOPATH)/bin"
+
+# fish — run once
+fish_add_path (go env GOPATH)/bin
+```
 
 ### Pre-built binaries (curl)
 
