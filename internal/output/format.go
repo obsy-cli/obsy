@@ -35,14 +35,16 @@ func Print(w io.Writer, format string, rows []Row) error {
 		return nil
 	}
 	switch strings.ToLower(format) {
+	case "text", "":
+		return printText(w, rows)
 	case "json":
 		return printJSON(w, rows)
 	case "tsv":
 		return printSV(w, rows, '\t')
 	case "csv":
 		return printSV(w, rows, ',')
-	default: // text
-		return printText(w, rows)
+	default:
+		return fmt.Errorf("unknown format %q: want text|json|tsv|csv", format)
 	}
 }
 

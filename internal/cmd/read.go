@@ -28,7 +28,7 @@ func init() {
 			if err != nil {
 				return err
 			}
-			_, body := parser.ParseFrontmatter(content)
+			_, body, _ := parser.ParseFrontmatter(content)
 			fmt.Fprint(os.Stdout, string(body))
 			return nil
 		},

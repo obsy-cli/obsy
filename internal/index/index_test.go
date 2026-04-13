@@ -1,8 +1,11 @@
 package index_test
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -318,5 +321,58 @@ func TestIncrementalScan_RemovesDeletedFile(t *testing.T) {
 	}
 	if _, ok := updated.Files["phantom.md"]; ok {
 		t.Error("phantom file should have been removed by incremental scan")
+	}
+}
+
+func TestFullScan_UnreadableFileWarnsToStderr(t *testing.T) {
+	// Build a temp vault with one unreadable file.
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".obsidian"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "good.md"), []byte("# Good"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bad := filepath.Join(root, "bad.md")
+	if err := os.WriteFile(bad, []byte("# Bad"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	// Restore permissions after test so t.TempDir cleanup can remove it.
+	t.Cleanup(func() { os.Chmod(bad, 0o644) })
+
+	// Running as root bypasses permission checks — skip in that case.
+	if os.Getuid() == 0 {
+		t.Skip("running as root: file permissions are not enforced")
+	}
+
+	v, err := vault.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Capture stderr.
+	r, w, _ := os.Pipe()
+	orig := os.Stderr
+	os.Stderr = w
+
+	idx, err := index.Full(v)
+
+	w.Close()
+	os.Stderr = orig
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	r.Close()
+
+	if err != nil {
+		t.Fatalf("Full scan returned error: %v", err)
+	}
+	if _, ok := idx.Files["good.md"]; !ok {
+		t.Error("good.md should still be indexed despite bad.md failure")
+	}
+	if _, ok := idx.Files["bad.md"]; ok {
+		t.Error("bad.md should have been skipped")
+	}
+	if !strings.Contains(buf.String(), "warning") {
+		t.Errorf("expected warning on stderr, got: %q", buf.String())
 	}
 }

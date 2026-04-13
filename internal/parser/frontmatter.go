@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,31 +15,32 @@ type Frontmatter struct {
 }
 
 // ParseFrontmatter extracts YAML front matter from content.
-// Returns the parsed front matter and the body (content after the closing ---).
-// If no front matter is present, body == content and Frontmatter is zero.
-func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
+// Returns the parsed front matter, the body (content after the closing ---), and any error.
+// If no front matter is present, body == content, Frontmatter is zero, and err is nil.
+// err is non-nil only when a valid front matter block is found but the YAML inside is malformed.
+func ParseFrontmatter(content []byte) (Frontmatter, []byte, error) {
 	const delim = "---"
 
 	// Must start with "---\n" or "---\r\n".
 	if !bytes.HasPrefix(content, []byte("---")) {
-		return Frontmatter{}, content
+		return Frontmatter{}, content, nil
 	}
 	rest := content[3:]
 	if len(rest) == 0 || (rest[0] != '\n' && rest[0] != '\r') {
-		return Frontmatter{}, content
+		return Frontmatter{}, content, nil
 	}
 	if rest[0] == '\r' {
 		rest = rest[1:]
 	}
 	if len(rest) == 0 || rest[0] != '\n' {
-		return Frontmatter{}, content
+		return Frontmatter{}, content, nil
 	}
 	rest = rest[1:] // consume \n
 
 	// Find closing ---.
 	end := findDelimiter(rest, delim)
 	if end < 0 {
-		return Frontmatter{}, content
+		return Frontmatter{}, content, nil
 	}
 
 	yamlBytes := rest[:end]
@@ -53,13 +55,13 @@ func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
 
 	var raw map[string]any
 	if err := yaml.Unmarshal(yamlBytes, &raw); err != nil {
-		return Frontmatter{}, content
+		return Frontmatter{}, content, fmt.Errorf("malformed frontmatter YAML: %w", err)
 	}
 
 	fm := Frontmatter{Props: raw}
 	fm.Tags = stringSlice(raw, "tags")
 	fm.Aliases = stringSlice(raw, "aliases")
-	return fm, body
+	return fm, body, nil
 }
 
 // findDelimiter finds the position of "---" at the start of a line within b.

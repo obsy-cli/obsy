@@ -98,8 +98,9 @@ func init() {
 					if !ok {
 						return noResults()
 					}
-					fmt.Fprintln(os.Stdout, fmt.Sprint(val))
-					return nil
+					return output.Print(os.Stdout, cfg.Format, []output.Row{
+						output.NewRow("file", resolved, "value", fmt.Sprint(val)),
+					})
 				}
 
 				type propEntry struct {

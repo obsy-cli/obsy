@@ -23,9 +23,6 @@ func init() {
 			if err != nil {
 				return err
 			}
-			if result == nil {
-				return fmt.Errorf("file not found: %s", args[0])
-			}
 			if !cfg.Quiet {
 				fmt.Fprintf(os.Stderr, "renamed: %s → %s\n", result.OldPath, result.NewPath)
 				if len(result.Updated) > 0 {

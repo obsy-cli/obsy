@@ -1,6 +1,7 @@
 package ops
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 func Rename(v *vault.Vault, idx *index.Index, src, newName string) (*MoveResult, error) {
 	srcRel, ok := idx.ResolveFileArg(src)
 	if !ok {
-		return nil, nil
+		return nil, fmt.Errorf("file not found: %s", src)
 	}
 
 	// Preserve extension.

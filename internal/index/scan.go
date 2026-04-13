@@ -1,6 +1,8 @@
 package index
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,7 +21,8 @@ func Full(v *vault.Vault) (*Index, error) {
 	for _, rel := range files {
 		entry, err := parseFile(v.Root, rel)
 		if err != nil {
-			continue // skip unreadable files
+			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", rel, err)
+			continue
 		}
 		idx.Files[rel] = entry
 	}
@@ -30,32 +33,28 @@ func Full(v *vault.Vault) (*Index, error) {
 }
 
 // Incremental updates an existing index with changed/new files and removes deleted ones.
+// Uses FilesWithMtime so mtime comparison costs no extra stat calls beyond the walk.
 func Incremental(v *vault.Vault, existing *Index) (*Index, error) {
-	files, err := v.Files()
+	infos, err := v.FilesWithMtime()
 	if err != nil {
 		return nil, err
 	}
 
-	seen := make(map[string]bool, len(files))
-	for _, rel := range files {
-		seen[rel] = true
+	seen := make(map[string]bool, len(infos))
+	for _, info := range infos {
+		seen[info.Path] = true
+		mtime := info.Mtime.UnixNano()
 
-		absPath := filepath.Join(v.Root, rel)
-		fi, err := os.Stat(absPath)
-		if err != nil {
-			continue
-		}
-		mtime := fi.ModTime().UnixNano()
-
-		if entry, ok := existing.Files[rel]; ok && entry.Mtime == mtime {
+		if entry, ok := existing.Files[info.Path]; ok && entry.Mtime == mtime {
 			continue // unchanged
 		}
 
-		entry, err := parseFile(v.Root, rel)
+		entry, err := parseFile(v.Root, info.Path)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", info.Path, err)
 			continue
 		}
-		existing.Files[rel] = entry
+		existing.Files[info.Path] = entry
 	}
 
 	// Remove deleted files.
@@ -90,17 +89,26 @@ func LoadOrBuild(v *vault.Vault, noCache bool) (*Index, error) {
 // parseFile reads and parses a single .md file into a FileEntry.
 func parseFile(vaultRoot, rel string) (*FileEntry, error) {
 	absPath := filepath.Join(vaultRoot, rel)
-	content, err := os.ReadFile(absPath)
+	f, err := os.Open(absPath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	fi, err := os.Stat(absPath)
+	content, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
 
-	fm, body := parser.ParseFrontmatter(content)
+	fm, body, fmErr := parser.ParseFrontmatter(content)
+	if fmErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: %s: %v\n", rel, fmErr)
+	}
 	links := parser.ParseLinks(body)
 	inlineTags := parser.ParseInlineTags(body)
 	tasks := parser.ParseTasks(body)

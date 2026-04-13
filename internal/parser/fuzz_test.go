@@ -62,7 +62,7 @@ func FuzzParseFrontmatter(f *testing.F) {
 		f.Add([]byte(s))
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		_, _ = ParseFrontmatter(data)
+		_, _, _ = ParseFrontmatter(data)
 	})
 }
 

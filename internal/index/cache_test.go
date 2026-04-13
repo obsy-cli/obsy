@@ -27,8 +27,8 @@ func TestVaultID_Distinct(t *testing.T) {
 
 func TestVaultID_Length(t *testing.T) {
 	id := VaultID("/any/path")
-	if len(id) != 8 {
-		t.Errorf("VaultID length = %d, want 8", len(id))
+	if len(id) != 16 {
+		t.Errorf("VaultID length = %d, want 16", len(id))
 	}
 }
 

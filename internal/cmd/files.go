@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/obsy-cli/obsy/internal/output"
 	"github.com/obsy-cli/obsy/internal/vault"
@@ -28,52 +26,44 @@ func init() {
 			if err != nil {
 				return err
 			}
-			files, err := v.Files()
+
+			// FilesWithMtime reuses mtime data already collected during the walk.
+			infos, err := v.FilesWithMtime()
 			if err != nil {
 				return err
 			}
 
 			if folder != "" {
-				var filtered []string
-				for _, f := range files {
-					if strings.HasPrefix(f, folder) {
-						filtered = append(filtered, f)
+				var filtered []vault.FileMeta
+				for _, fi := range infos {
+					if strings.HasPrefix(fi.Path, folder) {
+						filtered = append(filtered, fi)
 					}
 				}
-				files = filtered
+				infos = filtered
 			}
 
-			if len(files) == 0 {
+			if len(infos) == 0 {
 				return noResults()
 			}
 			if total {
-				return totalOnly(len(files))
+				return totalOnly(len(infos))
 			}
 
 			// Sort.
 			if sortBy == "modified" {
-				type entry struct {
-					path  string
-					mtime time.Time
-				}
-				entries := make([]entry, 0, len(files))
-				for _, f := range files {
-					abs := filepath.Join(v.Root, f)
-					fi, err := os.Stat(abs)
-					if err != nil {
-						continue
-					}
-					entries = append(entries, entry{f, fi.ModTime()})
-				}
-				sort.Slice(entries, func(i, j int) bool {
-					return entries[i].mtime.After(entries[j].mtime)
+				sort.Slice(infos, func(i, j int) bool {
+					return infos[i].Mtime.After(infos[j].Mtime)
 				})
-				files = make([]string, len(entries))
-				for i, e := range entries {
-					files[i] = e.path
-				}
 			} else {
-				sort.Strings(files)
+				sort.Slice(infos, func(i, j int) bool {
+					return infos[i].Path < infos[j].Path
+				})
+			}
+
+			files := make([]string, len(infos))
+			for i, fi := range infos {
+				files[i] = fi.Path
 			}
 
 			if limit > 0 && len(files) > limit {

@@ -130,6 +130,52 @@ func TestFiles_Symlink(t *testing.T) {
 
 // --- Discover ---
 
+func TestFilesWithMtime_PopulatesMtime(t *testing.T) {
+	v := makeVault(t, map[string]string{
+		"a.md":     "# A",
+		"sub/b.md": "# B",
+	})
+	infos, err := v.FilesWithMtime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(infos) != 2 {
+		t.Fatalf("got %d entries, want 2", len(infos))
+	}
+	for _, fi := range infos {
+		if fi.Mtime.IsZero() {
+			t.Errorf("%s: Mtime is zero", fi.Path)
+		}
+	}
+}
+
+func TestFilesWithMtime_ConsistentWithFiles(t *testing.T) {
+	v := makeVault(t, map[string]string{
+		"a.md":     "# A",
+		"sub/b.md": "# B",
+	})
+	paths, err := v.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	infos, err := v.FilesWithMtime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != len(infos) {
+		t.Fatalf("Files() returned %d, FilesWithMtime() returned %d", len(paths), len(infos))
+	}
+	pathSet := make(map[string]bool)
+	for _, p := range paths {
+		pathSet[p] = true
+	}
+	for _, fi := range infos {
+		if !pathSet[fi.Path] {
+			t.Errorf("FilesWithMtime path %q not in Files()", fi.Path)
+		}
+	}
+}
+
 func TestDiscover_Explicit(t *testing.T) {
 	tmp := t.TempDir()
 	v, err := Discover(tmp)

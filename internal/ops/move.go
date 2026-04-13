@@ -112,6 +112,10 @@ func validateWritable(v *vault.Vault, paths []string) error {
 // rewriteLinks rewrites wikilinks in a file from old name to new name.
 func rewriteLinks(v *vault.Vault, rel, oldBase, newBase, oldRel, newRel string) error {
 	abs := filepath.Join(v.Root, rel)
+	fi, err := os.Stat(abs)
+	if err != nil {
+		return err
+	}
 	content, err := os.ReadFile(abs)
 	if err != nil {
 		return err
@@ -121,7 +125,7 @@ func rewriteLinks(v *vault.Vault, rel, oldBase, newBase, oldRel, newRel string) 
 	if updated == string(content) {
 		return nil // nothing changed
 	}
-	return os.WriteFile(abs, []byte(updated), 0o644)
+	return os.WriteFile(abs, []byte(updated), fi.Mode())
 }
 
 // rewriteWikilinks replaces [[old]] with [[new]] in content.
@@ -154,9 +158,12 @@ func rewriteWikilinks(content, oldBase, newBase, oldRel, newRel string) string {
 		if k := strings.IndexByte(pathPart, '|'); k >= 0 {
 			pathPart = pathPart[:k]
 		}
+		// Capture unstripped length before TrimSpace so suffix offset is correct.
+		// e.g. inner=" note-a |alias": unstripped len=8, trimmed len=6; inner[6:]="a |alias" (wrong).
+		pathPartRawLen := len(pathPart)
 		pathPart = strings.TrimSpace(pathPart)
 
-		suffix := inner[len(pathPart):]
+		suffix := inner[pathPartRawLen:]
 
 		// Match by basename or full relative path.
 		base := strings.TrimSuffix(filepath.Base(pathPart), ".md")

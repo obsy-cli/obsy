@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Vault represents a discovered Obsidian vault.
@@ -63,17 +64,37 @@ func Discover(explicit string) (*Vault, error) {
 	return nil, ErrNotFound
 }
 
+// FileMeta holds a vault-relative path and its last-modified time.
+type FileMeta struct {
+	Path  string
+	Mtime time.Time
+}
+
 // Files returns all .md file paths relative to the vault root,
-// skipping hidden paths, .obsidian/, .git/, and .trash/.
+// skipping hidden paths and symlinks.
 func (v *Vault) Files() ([]string, error) {
-	var files []string
+	infos, err := v.FilesWithMtime()
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, len(infos))
+	for i, fi := range infos {
+		paths[i] = fi.Path
+	}
+	return paths, nil
+}
+
+// FilesWithMtime returns all .md files with their modification times,
+// reusing the data already collected during the directory walk (no extra stat).
+func (v *Vault) FilesWithMtime() ([]FileMeta, error) {
+	var files []FileMeta
 	err := filepath.WalkDir(v.Root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		name := d.Name()
 
-		// Skip hidden files and directories, and known excluded dirs.
+		// Skip hidden files and directories.
 		if strings.HasPrefix(name, ".") {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -81,9 +102,6 @@ func (v *Vault) Files() ([]string, error) {
 			return nil
 		}
 		if d.IsDir() {
-			switch name {
-			case "img": // non-excluded, but skip nothing extra
-			}
 			return nil
 		}
 
@@ -97,7 +115,12 @@ func (v *Vault) Files() ([]string, error) {
 			if err != nil {
 				return err
 			}
-			files = append(files, rel)
+			// DirEntry.Info() reuses data already fetched by WalkDir — no extra syscall.
+			fi, err := d.Info()
+			if err != nil {
+				return err
+			}
+			files = append(files, FileMeta{Path: rel, Mtime: fi.ModTime()})
 		}
 		return nil
 	})

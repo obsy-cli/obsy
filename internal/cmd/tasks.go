@@ -36,16 +36,23 @@ func init() {
 			}
 			var items []taskItem
 
+			// Resolve --file once before the loop.
+			var resolvedFile string
+			if file != "" {
+				r, ok := idx.ResolveFileArg(file)
+				if !ok {
+					return noResults()
+				}
+				resolvedFile = r
+			}
+
 			files := idx.AllFiles()
 			for _, f := range files {
 				if pathFilter != "" && !strings.HasPrefix(f, pathFilter) {
 					continue
 				}
-				if file != "" {
-					resolved, ok := idx.ResolveFileArg(file)
-					if !ok || resolved != f {
-						continue
-					}
+				if resolvedFile != "" && f != resolvedFile {
+					continue
 				}
 				entry := idx.Files[f]
 				for _, t := range entry.Tasks {

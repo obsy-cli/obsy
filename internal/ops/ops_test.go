@@ -106,6 +106,27 @@ func TestRewriteWikilinks_BasenameCollision(t *testing.T) {
 	}
 }
 
+func TestRewriteWikilinks_SpacedLink(t *testing.T) {
+	// Links with internal spaces (non-standard but possible via manual edits).
+	// The suffix offset bug would corrupt text after the path component; verify it doesn't.
+	// Leading spaces inside [[ are normalised away; suffix starts where the raw path ended.
+	cases := []struct {
+		content string
+		want    string
+	}{
+		// Leading/trailing spaces around name → name normalised, suffix preserved.
+		{"[[ note-a ]]", "[[note-b]]"},
+		{"[[ note-a | alias ]]", "[[note-b| alias ]]"},
+		{"[[ note-a #heading | alias ]]", "[[note-b#heading | alias ]]"},
+	}
+	for _, tc := range cases {
+		got := rewriteWikilinks(tc.content, "note-a", "note-b", "note-a.md", "note-b.md")
+		if got != tc.want {
+			t.Errorf("rewriteWikilinks(%q)\n got  %q\n want %q", tc.content, got, tc.want)
+		}
+	}
+}
+
 func TestRewriteWikilinks_UnclosedBracket(t *testing.T) {
 	// Unclosed [[ should be passed through verbatim.
 	content := "start [[unclosed"
@@ -413,5 +434,37 @@ func TestRename_StaysInSameDir(t *testing.T) {
 	}
 	if result.NewPath != "sub/child-renamed.md" {
 		t.Errorf("NewPath = %q, want sub/child-renamed.md", result.NewPath)
+	}
+}
+
+func TestRename_FileNotFound(t *testing.T) {
+	v, idx := setupTempVault(t)
+	_, err := Rename(v, idx, "no-such-file.md", "new-name")
+	if err == nil {
+		t.Error("expected error for non-existent source, got nil")
+	}
+}
+
+func TestMove_PreservesFilePermissions(t *testing.T) {
+	v, idx := setupTempVault(t)
+
+	// Make index.md only owner-readable.
+	abs := filepath.Join(v.Root, "index.md")
+	if err := os.Chmod(abs, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Move note-a.md (linked from index.md) — this triggers a link rewrite on index.md.
+	_, err := Move(v, idx, "note-a.md", "notes/note-a.md")
+	if err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	fi, err := os.Stat(abs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("index.md permissions = %o after rewrite, want 0600", fi.Mode().Perm())
 	}
 }

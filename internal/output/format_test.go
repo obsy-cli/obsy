@@ -125,14 +125,15 @@ func TestPrint_CSV(t *testing.T) {
 	}
 }
 
-func TestPrint_UnknownFormat_FallsBackToText(t *testing.T) {
+func TestPrint_UnknownFormat_ReturnsError(t *testing.T) {
 	rows := []Row{NewRow("path", "x.md")}
 	var buf bytes.Buffer
-	if err := Print(&buf, "UNKNOWN", rows); err != nil {
-		t.Fatal(err)
+	err := Print(&buf, "UNKNOWN", rows)
+	if err == nil {
+		t.Fatal("expected error for unknown format, got nil")
 	}
-	if strings.TrimSpace(buf.String()) != "x.md" {
-		t.Errorf("expected text fallback, got %q", buf.String())
+	if buf.Len() != 0 {
+		t.Errorf("expected no output on error, got %q", buf.String())
 	}
 }
 

@@ -12,6 +12,7 @@ func TestParseFrontmatter(t *testing.T) {
 		wantTags    []string
 		wantAliases []string
 		wantBody    string
+		wantErr     bool
 	}{
 		{
 			name:     "no frontmatter",
@@ -77,12 +78,21 @@ func TestParseFrontmatter(t *testing.T) {
 			wantTags: []string{"t"},
 			wantBody: "\nParagraph.",
 		},
+		{
+			name:     "malformed YAML returns error",
+			input:    "---\ntags: [unclosed\n---\nBody.",
+			wantBody: "---\ntags: [unclosed\n---\nBody.",
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fm, body := ParseFrontmatter([]byte(tt.input))
+			fm, body, err := ParseFrontmatter([]byte(tt.input))
 
+			if (err != nil) != tt.wantErr {
+				t.Errorf("err = %v, wantErr = %v", err, tt.wantErr)
+			}
 			if !reflect.DeepEqual(fm.Tags, tt.wantTags) {
 				t.Errorf("Tags = %v, want %v", fm.Tags, tt.wantTags)
 			}

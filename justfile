@@ -173,49 +173,82 @@ smoke: build
             (( ok++ )) || true
         else
             printf "  ✗  %s  (pattern '%s' not found in output)\n" "$desc" "$pattern"
-            printf "     output: %s\n" "$(echo "$out" | head -3)"
+            printf "     output: %s\n" "$(echo "$out" | head -5)"
             (( fail++ )) || true
         fi
     }
 
+    check_not() {
+        local desc="$1"; local pattern="$2"; shift 2
+        local out
+        out=$("$bin" --vault="$vault" "$@" 2>&1) || true
+        if echo "$out" | grep -q "$pattern"; then
+            printf "  ✗  %s  (unexpected pattern '%s' found)\n" "$desc" "$pattern"
+            printf "     output: %s\n" "$(echo "$out" | head -5)"
+            (( fail++ )) || true
+        else
+            printf "  ✓  %s\n" "$desc"
+            (( ok++ )) || true
+        fi
+    }
+
     echo "── files ─────────────────────────────────────"
-    check         "files"                         files
-    check         "files --format=json"           files --format=json
-    check         "files --format=tsv"            files --format=tsv
-    check_output  "files count=12"      "12"      files --total
+    check         "files"                                 files
+    check         "files --format=json"                   files --format=json
+    check         "files --format=tsv"                    files --format=tsv
+    check_output  "files --total=12"            "^12$"    files --total
+    check_output  "files --sort=modified"       "note-a"  files --sort=modified
+    check_output  "files --folder=sub"          "child"   files --folder=sub
+    check_not     "files --folder=sub no root"  "index"   files --folder=sub
 
     echo "── search ────────────────────────────────────"
-    check         "search basic"                  search "science"
-    check         "search --context"              search "science" --context
-    check         "search --case-sensitive"       search "Science" --case-sensitive
-    check         "search --path"                 search "note" --path=sub/
-    check         "search no results (exit 1)"    search "zzznomatch"
+    check_output  "search basic finds note-a"             "note-a"  search "science"
+    check_output  "search --context has surrounding text" "science" search "science" --context
+    check_output  "search --case-sensitive positive"      "note-a"  search "science" --case-sensitive
+    check         "search --case-sensitive negative"                 search "Science" --case-sensitive
+    check_output  "search --path=sub finds child"         "child"   search "child" --path=sub/
+    check         "search no results (exit 1)"                       search "zzznomatch"
 
     echo "── graph ─────────────────────────────────────"
-    check         "unresolved"                    unresolved
-    check         "orphans"                       orphans
-    check         "deadends"                      deadends
-    check_output  "backlinks to note-a"  "index"  backlinks note-a
-    check         "links from index"              links index.md
-    check         "links --resolve"               links index.md --resolve
+    check_output  "unresolved: does-not-exist"       "does-not-exist"  unresolved
+    check_output  "unresolved: also-missing"         "also-missing"    unresolved
+    check_output  "unresolved: nonexistent.pdf"      "nonexistent.pdf" unresolved
+    check_not     "unresolved: nota resolves (alias)" "nota"           unresolved
+    check_output  "orphans includes note-b"          "note-b"          orphans
+    check_not     "orphans excludes index.md"        "index"           orphans
+    check_output  "deadends includes dead-end"       "dead-end"        deadends
+    check_not     "deadends excludes note-a"         "note-a"          deadends
+    check_output  "backlinks note-a: index"          "index"           backlinks note-a
+    check_output  "backlinks note-a: aliases.md"     "aliases"         backlinks note-a
+    check_output  "backlinks ambiguous from note-a"  "note-a"          backlinks ambiguous
+    check_output  "links index --resolve: note-a.md" "note-a.md"       links index.md --resolve
+    check_output  "links index --resolve: dead-end"  "dead-end.md"     links index.md --resolve
+    check_output  "links circular-a: terminates"     "circular-b"      links circular-a
+    check_output  "alias nota resolves to note-a"    "note-a.md"       links aliases.md --resolve
+    check_output  "ambiguous resolves to root"        "ambiguous.md"   links note-a.md --resolve
+    check_not     "ambiguous not sub/ambiguous"       "sub/ambiguous"  links note-a.md --resolve
 
     echo "── tags / properties / tasks ─────────────────"
-    check         "tags"                          tags
-    check         "tag science"                   tag science
-    check         "properties"                    properties
-    check         "tasks"                         tasks
-    check         "tasks --todo"                  tasks --todo
-    check         "tasks --file=note-a.md"        tasks --file=note-a.md
+    check_output  "tags lists science"            "science"      tags
+    check_output  "tag science includes note-a"   "note-a"       tag science
+    check_output  "properties lists tags"         "tags"         properties
+    check_output  "properties --counts: tags=12"  "12"           properties --counts
+    check_output  "tasks --done finds done tasks" "Done task"    tasks --done
+    check         "tasks --todo"                                   tasks --todo
+    check_output  "tasks --file=note-a.md"        "Task A"       tasks --file=note-a.md
+    check_output  "tasks --path=sub finds buried" "buried"       tasks --path=sub
+    check_output  "tasks --total=7"               "^7$"          tasks --total
 
     echo "── read / outline / status ───────────────────"
-    check         "read note-a"                   read note-a
-    check         "outline note-a"                outline note-a
-    check         "status"                        status
+    check_output  "read note-a content"           "Note A"       read note-a
+    check_output  "outline note-a headings"       "Overview"     outline note-a
+    check_output  "status: 12 files"              "12"           status
+    check_output  "status: vault path"            "testdata"     status
 
     echo "── formats ───────────────────────────────────"
-    check_output  "unresolved json"  "does-not-exist"  unresolved --format=json
-    check_output  "tags tsv header"  "tag"             tags --format=tsv
-    check_output  "tags csv header"  "tag"             tags --format=csv
+    check_output  "unresolved json: does-not-exist" "does-not-exist"  unresolved --format=json
+    check_output  "tags tsv header"                 "tag"             tags --format=tsv
+    check_output  "tags csv header"                 "tag"             tags --format=csv
 
     echo
     printf "  %d passed, %d failed\n" "$ok" "$fail"

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/obsy-cli/obsy/internal/ops"
 	"github.com/obsy-cli/obsy/internal/output"
@@ -39,12 +40,22 @@ func init() {
 			}
 
 			if context {
-				for _, r := range results {
-					for _, line := range r.Context {
-						fmt.Fprintf(os.Stdout, "%s: %s\n", r.Path, line)
+				if cfg.Format == "text" {
+					for _, r := range results {
+						for _, line := range r.Context {
+							fmt.Fprintf(os.Stdout, "%s: %s\n", r.Path, line)
+						}
 					}
+					return nil
 				}
-				return nil
+				var rows []output.Row
+				for _, r := range results {
+					rows = append(rows, output.NewRow(
+						"path", r.Path,
+						"lines", strings.Join(r.Context, "\n"),
+					))
+				}
+				return output.Print(os.Stdout, cfg.Format, rows)
 			}
 
 			var rows []output.Row

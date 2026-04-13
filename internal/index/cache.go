@@ -15,19 +15,24 @@ func init() {
 	gob.Register(map[interface{}]interface{}{})
 }
 
-// VaultID returns the first 8 hex chars of SHA-256 of the vault's absolute path.
+// VaultID returns the first 16 hex chars (8 bytes) of SHA-256 of the vault's absolute path.
 func VaultID(vaultRoot string) string {
 	sum := sha256.Sum256([]byte(vaultRoot))
-	return fmt.Sprintf("%x", sum[:4])
+	return fmt.Sprintf("%x", sum[:8])
 }
 
 // CachePath returns the path to the cache file for the given vault root.
 // Respects $XDG_CACHE_HOME; falls back to ~/.cache.
+// Falls back to os.TempDir() if the home directory cannot be determined.
 func CachePath(vaultRoot string) string {
 	cacheDir := os.Getenv("XDG_CACHE_HOME")
 	if cacheDir == "" {
-		home, _ := os.UserHomeDir()
-		cacheDir = filepath.Join(home, ".cache")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			cacheDir = filepath.Join(os.TempDir(), "obsy-cache")
+		} else {
+			cacheDir = filepath.Join(home, ".cache")
+		}
 	}
 	return filepath.Join(cacheDir, "obsy", VaultID(vaultRoot), "index.gob")
 }
@@ -62,7 +67,7 @@ func Save(idx *Index) error {
 	}
 	if err := gob.NewEncoder(f).Encode(idx); err != nil {
 		f.Close()
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return err
 	}
 	f.Close()

@@ -1,6 +1,8 @@
 package index
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,11 +25,25 @@ type OutgoingLink struct {
 }
 
 // AliasMap builds alias→path from the current index.
+// If two files claim the same alias, a warning is printed to stderr and the
+// lexicographically first file path wins (deterministic behaviour).
 func (idx *Index) AliasMap() map[string]string {
 	m := make(map[string]string)
 	for path, entry := range idx.Files {
 		for _, a := range entry.Aliases {
-			if a != "" {
+			if a == "" {
+				continue
+			}
+			if existing, collision := m[a]; collision {
+				// Keep lexicographically first for determinism.
+				winner := existing
+				if path < existing {
+					m[a] = path
+					winner = path
+				}
+				fmt.Fprintf(os.Stderr, "warning: alias %q claimed by %s and %s; using %s\n",
+					a, existing, path, winner)
+			} else {
 				m[a] = path
 			}
 		}

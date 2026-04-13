@@ -32,7 +32,7 @@ func init() {
 			if err != nil {
 				return err
 			}
-			_, body := parser.ParseFrontmatter(content)
+			_, body, _ := parser.ParseFrontmatter(content)
 			headings := parser.ParseHeadings(body)
 			if len(headings) == 0 {
 				return noResults()
