@@ -156,7 +156,13 @@ func rewriteWikilinks(content, oldBase, newBase, oldRel, newRel string) string {
 			pathPart = pathPart[:k]
 		}
 		if k := strings.IndexByte(pathPart, '|'); k >= 0 {
-			pathPart = pathPart[:k]
+			// \| is how Obsidian escapes pipes inside markdown table cells.
+			// Strip the backslash so the path is clean; suffix retains \| for round-trip fidelity.
+			if k > 0 && pathPart[k-1] == '\\' {
+				pathPart = pathPart[:k-1]
+			} else {
+				pathPart = pathPart[:k]
+			}
 		}
 		// Capture unstripped length before TrimSpace so suffix offset is correct.
 		// e.g. inner=" note-a |alias": unstripped len=8, trimmed len=6; inner[6:]="a |alias" (wrong).

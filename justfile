@@ -196,7 +196,7 @@ smoke: build
     check         "files"                                 files
     check         "files --format=json"                   files --format=json
     check         "files --format=tsv"                    files --format=tsv
-    check_output  "files --total=12"            "^12$"    files --total
+    check_output  "files --total=13"            "^13$"    files --total
     check_output  "files --sort=modified"       "note-a"  files --sort=modified
     check_output  "files --folder=sub"          "child"   files --folder=sub
     check_not     "files --folder=sub no root"  "index"   files --folder=sub
@@ -213,13 +213,16 @@ smoke: build
     check_output  "unresolved: does-not-exist"       "does-not-exist"  unresolved
     check_output  "unresolved: also-missing"         "also-missing"    unresolved
     check_output  "unresolved: nonexistent.pdf"      "nonexistent.pdf" unresolved
-    check_not     "unresolved: nota resolves (alias)" "nota"           unresolved
-    check_output  "orphans includes note-b"          "note-b"          orphans
+    check_not     "unresolved: nota resolves (alias)"        "nota"        unresolved
+    check_not     "unresolved: escaped-pipe links resolve"  "table-links" unresolved
+    check_not     "unresolved: \\| not treated as target"   'note-a\\'    unresolved
+    check_output  "orphans includes broken.md"        "broken"          orphans
     check_not     "orphans excludes index.md"        "index"           orphans
     check_output  "deadends includes dead-end"       "dead-end"        deadends
     check_not     "deadends excludes note-a"         "note-a"          deadends
     check_output  "backlinks note-a: index"          "index"           backlinks note-a
-    check_output  "backlinks note-a: aliases.md"     "aliases"         backlinks note-a
+    check_output  "backlinks note-a: aliases.md"          "aliases"      backlinks note-a
+    check_output  "backlinks note-a: table-links.md"     "table-links"  backlinks note-a
     check_output  "backlinks ambiguous from note-a"  "note-a"          backlinks ambiguous
     check_output  "links index --resolve: note-a.md" "note-a.md"       links index.md --resolve
     check_output  "links index --resolve: dead-end"  "dead-end.md"     links index.md --resolve
@@ -232,7 +235,7 @@ smoke: build
     check_output  "tags lists science"            "science"      tags
     check_output  "tag science includes note-a"   "note-a"       tag science
     check_output  "properties lists tags"         "tags"         properties
-    check_output  "properties --counts: tags=12"  "12"           properties --counts
+    check_output  "properties --counts: tags=13"  "13"           properties --counts
     check_output  "tasks --done finds done tasks" "Done task"    tasks --done
     check         "tasks --todo"                                   tasks --todo
     check_output  "tasks --file=note-a.md"        "Task A"       tasks --file=note-a.md
@@ -242,7 +245,7 @@ smoke: build
     echo "── read / outline / status ───────────────────"
     check_output  "read note-a content"           "Note A"       read note-a
     check_output  "outline note-a headings"       "Overview"     outline note-a
-    check_output  "status: 12 files"              "12"           status
+    check_output  "status: 13 files"              "13"           status
     check_output  "status: vault path"            "testdata"     status
 
     echo "── formats ───────────────────────────────────"

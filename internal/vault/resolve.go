@@ -19,7 +19,13 @@ func StripLinkTarget(raw string) string {
 		t = t[:i]
 	}
 	if i := strings.IndexByte(t, '|'); i >= 0 {
-		t = t[:i]
+		// \| is how Obsidian escapes the pipe inside markdown table cells.
+		// Strip the backslash too so the path component is clean.
+		if i > 0 && t[i-1] == '\\' {
+			t = t[:i-1]
+		} else {
+			t = t[:i]
+		}
 	}
 	return strings.TrimSpace(t)
 }

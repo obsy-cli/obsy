@@ -28,11 +28,53 @@ func openTestVault(t *testing.T) (*vault.Vault, *index.Index) {
 	return v, idx
 }
 
+// copyTestVault copies testdata/vault into a fresh t.TempDir() and returns
+// a vault and full index for the copy. Use this for tests that need to mutate
+// the vault (create/delete files) to avoid races with other packages that read
+// the real testdata/vault concurrently during `go test ./...`.
+func copyTestVault(t *testing.T) (*vault.Vault, *index.Index) {
+	t.Helper()
+	src, err := vault.Discover(testVault)
+	if err != nil {
+		t.Fatalf("discover source vault: %v", err)
+	}
+	dst := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dst, ".obsidian"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files, err := src.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range files {
+		dstAbs := filepath.Join(dst, rel)
+		if err := os.MkdirAll(filepath.Dir(dstAbs), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(src.Root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dstAbs, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	v, err := vault.Discover(dst)
+	if err != nil {
+		t.Fatalf("discover temp vault: %v", err)
+	}
+	idx, err := index.Full(v)
+	if err != nil {
+		t.Fatalf("full scan temp vault: %v", err)
+	}
+	return v, idx
+}
+
 func TestFullScan_FileCount(t *testing.T) {
 	_, idx := openTestVault(t)
-	// testdata/vault has 12 .md files (no hidden, no .obsidian)
-	if got := len(idx.Files); got != 12 {
-		t.Errorf("file count = %d, want 12", got)
+	// testdata/vault has 13 .md files (no hidden, no .obsidian)
+	if got := len(idx.Files); got != 13 {
+		t.Errorf("file count = %d, want 13", got)
 	}
 }
 
@@ -164,15 +206,19 @@ func TestOrphans(t *testing.T) {
 	_, idx := openTestVault(t)
 	orphans := idx.Orphans("")
 
-	// note-b.md and broken.md have no incoming links
+	// broken.md and table-links.md have no incoming links.
+	// note-b.md is no longer an orphan: table-links.md links to it.
 	orphanSet := make(map[string]bool)
 	for _, o := range orphans {
 		orphanSet[o] = true
 	}
-	for _, want := range []string{"note-b.md", "broken.md"} {
+	for _, want := range []string{"broken.md", "table-links.md"} {
 		if !orphanSet[want] {
 			t.Errorf("expected %q to be an orphan", want)
 		}
+	}
+	if orphanSet["note-b.md"] {
+		t.Error("note-b.md should not be an orphan (table-links.md links to it)")
 	}
 	// index.md, note-a.md, dead-end.md are NOT orphans
 	for _, notOrphan := range []string{"index.md", "note-a.md", "dead-end.md"} {
@@ -271,20 +317,19 @@ func TestResolveFileArg(t *testing.T) {
 // --- Incremental scan ---
 
 func TestIncrementalScan_DetectsNewFile(t *testing.T) {
-	v, idx := openTestVault(t)
+	// Use a temp copy so we don't race with other packages reading testdata/vault.
+	v, idx := copyTestVault(t)
 
-	// Create a temporary new file in the vault.
-	tmpFile := filepath.Join(v.Root, "tmp-incremental-test.md")
-	if err := os.WriteFile(tmpFile, []byte("# Temp\n\nTemp content."), 0o644); err != nil {
-		t.Fatalf("create temp file: %v", err)
+	newFile := filepath.Join(v.Root, "new-incremental.md")
+	if err := os.WriteFile(newFile, []byte("# New\n\nContent."), 0o644); err != nil {
+		t.Fatalf("create file: %v", err)
 	}
-	defer os.Remove(tmpFile)
 
 	updated, err := index.Incremental(v, idx)
 	if err != nil {
 		t.Fatalf("incremental scan: %v", err)
 	}
-	if _, ok := updated.Files["tmp-incremental-test.md"]; !ok {
+	if _, ok := updated.Files["new-incremental.md"]; !ok {
 		t.Error("new file not picked up by incremental scan")
 	}
 }

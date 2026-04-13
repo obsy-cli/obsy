@@ -17,6 +17,10 @@ func TestStripLinkTarget(t *testing.T) {
 		{"folder/note#h|d", "folder/note"},
 		{"  spaced  ", "spaced"},
 		{"", ""},
+		// Escaped pipe — used inside markdown table cells ([[note\|alias]]).
+		{`inbox/index\|inbox`, "inbox/index"},
+		{`note\|display text`, "note"},
+		{`folder/note\|d`, "folder/note"},
 	}
 	for _, tt := range tests {
 		got := StripLinkTarget(tt.input)

@@ -106,6 +106,30 @@ func TestRewriteWikilinks_BasenameCollision(t *testing.T) {
 	}
 }
 
+func TestRewriteWikilinks_EscapedPipe(t *testing.T) {
+	// Obsidian escapes | as \| inside markdown table cells.
+	// The path target must be resolved correctly and \| must be preserved in the output.
+	cases := []struct {
+		content          string
+		oldBase, newBase string
+		oldRel, newRel   string
+		want             string
+	}{
+		// Bare name in table cell — target is note-a, display text preserved.
+		{`[[note-a\|alias]]`, "note-a", "note-b", "note-a.md", "note-b.md", `[[note-b\|alias]]`},
+		// Path-qualified in table cell — oldRel must match the qualified path for correct rewrite.
+		{`[[sub/note-a\|alias]]`, "note-a", "note-b", "sub/note-a.md", "sub/note-b.md", `[[sub/note-b\|alias]]`},
+		// Non-matching link — must be untouched.
+		{`[[other\|alias]]`, "note-a", "note-b", "note-a.md", "note-b.md", `[[other\|alias]]`},
+	}
+	for _, tc := range cases {
+		got := rewriteWikilinks(tc.content, tc.oldBase, tc.newBase, tc.oldRel, tc.newRel)
+		if got != tc.want {
+			t.Errorf("rewriteWikilinks(%q)\n got  %q\n want %q", tc.content, got, tc.want)
+		}
+	}
+}
+
 func TestRewriteWikilinks_SpacedLink(t *testing.T) {
 	// Links with internal spaces (non-standard but possible via manual edits).
 	// The suffix offset bug would corrupt text after the path component; verify it doesn't.
